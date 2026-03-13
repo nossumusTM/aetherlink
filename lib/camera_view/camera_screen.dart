@@ -6,6 +6,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../config/app_config.dart';
 import '../config/stream_settings.dart';
+import '../signaling/control_actions.dart';
 import '../signaling/signaling_client.dart';
 import '../signaling/signaling_message.dart';
 import '../ui/azure_theme.dart';
@@ -37,6 +38,9 @@ class _CameraScreenState extends State<CameraScreen> {
   String _connectionReport = 'P2P first · waiting to start';
   String? _recordingPath;
   bool _isAutoDimmed = false;
+  Timer? _offerRetryTimer;
+  bool _isSendingOffer = false;
+  bool _awaitingAnswer = false;
 
   String get _resolvedRoomId {
     final value = _roomController.text.trim();
@@ -83,14 +87,40 @@ class _CameraScreenState extends State<CameraScreen> {
       signaling.send(
         const SignalingMessage(
           type: SignalingMessageType.control,
-          payload: {'action': 'start'},
+          payload: {'action': SignalingControlAction.start},
+        ),
+      );
+      signaling.send(
+        const SignalingMessage(
+          type: SignalingMessageType.control,
+          payload: {'action': SignalingControlAction.cameraReady},
         ),
       );
     };
 
     signaling.onMessage = (message) async {
+      if (message.type == SignalingMessageType.join &&
+          message.payload['role'] == 'monitor') {
+        await _sendOfferIfPossible(
+          rtc: rtc,
+          signaling: signaling,
+          reason: 'monitor-joined',
+        );
+      }
       if (message.type == SignalingMessageType.control) {
+        if (message.payload['action'] == SignalingControlAction.monitorReady) {
+          await _sendOfferIfPossible(
+            rtc: rtc,
+            signaling: signaling,
+            reason: 'monitor-ready',
+          );
+        }
         AppLogger.info('Camera received control: ${message.payload}');
+      }
+      if (message.type == SignalingMessageType.answer) {
+        _offerRetryTimer?.cancel();
+        _offerRetryTimer = null;
+        _awaitingAnswer = false;
       }
       await rtc.handleSignalingMessage(message);
     };
@@ -101,6 +131,7 @@ class _CameraScreenState extends State<CameraScreen> {
     };
 
     signaling.onDisconnected = () {
+      _resetNegotiationState();
       if (mounted) {
         setState(() => _status = 'Session closed');
       }
@@ -108,6 +139,14 @@ class _CameraScreenState extends State<CameraScreen> {
 
     rtc.onSignal = signaling.send;
     rtc.onConnectionState = (state) {
+      if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected ||
+          state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected ||
+          state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
+          state == RTCPeerConnectionState.RTCPeerConnectionStateClosed) {
+        _offerRetryTimer?.cancel();
+        _offerRetryTimer = null;
+        _awaitingAnswer = false;
+      }
       if (mounted) {
         setState(() => _status = _peerStateLabel(state));
       }
@@ -131,9 +170,6 @@ class _CameraScreenState extends State<CameraScreen> {
 
       await signaling.connect();
 
-      final offer = await rtc.createOffer();
-      signaling.send(offer);
-
       if (!mounted) return;
       setState(() {
         _signaling = signaling;
@@ -144,6 +180,7 @@ class _CameraScreenState extends State<CameraScreen> {
       AppLogger.error('Unable to start camera streaming', error, stackTrace);
       await signaling.disconnect();
       await rtc.dispose();
+      _resetNegotiationState();
       if (!mounted) return;
       setState(() {
         _signaling = null;
@@ -158,12 +195,13 @@ class _CameraScreenState extends State<CameraScreen> {
     _signaling?.send(
       const SignalingMessage(
         type: SignalingMessageType.control,
-        payload: {'action': 'stop'},
+        payload: {'action': SignalingControlAction.stop},
       ),
     );
 
     await _signaling?.disconnect();
     await _rtc?.dispose();
+    _resetNegotiationState();
 
     if (!mounted) return;
     setState(() {
@@ -284,6 +322,54 @@ class _CameraScreenState extends State<CameraScreen> {
     _registerActivity();
   }
 
+  Future<void> _sendOfferIfPossible({
+    required RtcManager rtc,
+    required SignalingClient signaling,
+    required String reason,
+  }) async {
+    if (_isSendingOffer || _awaitingAnswer || !signaling.isConnected) {
+      return;
+    }
+
+    _isSendingOffer = true;
+    try {
+      final offer = await rtc.createOffer();
+      if (!signaling.isConnected) return;
+      signaling.send(offer);
+      _awaitingAnswer = true;
+      _scheduleOfferRetry(rtc: rtc, signaling: signaling);
+      AppLogger.info('Camera sent offer after $reason');
+    } catch (error, stackTrace) {
+      AppLogger.error('Failed to create camera offer', error, stackTrace);
+    } finally {
+      _isSendingOffer = false;
+    }
+  }
+
+  void _resetNegotiationState() {
+    _offerRetryTimer?.cancel();
+    _offerRetryTimer = null;
+    _isSendingOffer = false;
+    _awaitingAnswer = false;
+  }
+
+  void _scheduleOfferRetry({
+    required RtcManager rtc,
+    required SignalingClient signaling,
+  }) {
+    _offerRetryTimer?.cancel();
+    _offerRetryTimer = Timer(const Duration(seconds: 3), () {
+      _awaitingAnswer = false;
+      unawaited(
+        _sendOfferIfPossible(
+          rtc: rtc,
+          signaling: signaling,
+          reason: 'answer-timeout',
+        ),
+      );
+    });
+  }
+
   String _peerStateLabel(RTCPeerConnectionState state) {
     switch (state) {
       case RTCPeerConnectionState.RTCPeerConnectionStateNew:
@@ -359,6 +445,7 @@ class _CameraScreenState extends State<CameraScreen> {
   @override
   void dispose() {
     _autoDimTimer?.cancel();
+    _resetNegotiationState();
     _roomController.dispose();
     _signaling?.disconnect();
     _rtc?.dispose();

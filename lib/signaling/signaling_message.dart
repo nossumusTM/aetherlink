@@ -14,7 +14,7 @@ enum SignalingMessageType {
 /// - join: {"roomId": "...", "role": "camera|monitor"}
 /// - offer/answer: {"sdp": "...", "type": "offer|answer"}
 /// - ice-candidate: {"candidate": "...", "sdpMid": "...", "sdpMLineIndex": 0}
-/// - control: {"action": "start|stop"}
+/// - control: {"action": "start|stop|camera-ready|monitor-ready"}
 class SignalingMessage {
   const SignalingMessage({
     required this.type,

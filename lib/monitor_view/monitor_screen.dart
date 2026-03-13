@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -5,6 +6,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../config/app_config.dart';
 import '../config/stream_settings.dart';
+import '../signaling/control_actions.dart';
 import '../signaling/signaling_client.dart';
 import '../signaling/signaling_message.dart';
 import '../ui/azure_theme.dart';
@@ -34,6 +36,7 @@ class _MonitorScreenState extends State<MonitorScreen> {
   String _connectionReport = 'P2P first · idle';
   String? _recordingPath;
   bool _didAutoOpenFullscreen = false;
+  Timer? _monitorPresenceTimer;
 
   String get _resolvedRoomId {
     final value = _roomController.text.trim();
@@ -76,12 +79,22 @@ class _MonitorScreenState extends State<MonitorScreen> {
           payload: {'roomId': _transmissionRoomId, 'role': 'monitor'},
         ),
       );
+      _startMonitorPresence(signaling);
     };
 
     signaling.onMessage = (message) async {
+      if (message.type == SignalingMessageType.join &&
+          message.payload['role'] == 'camera') {
+        _sendMonitorReady(signaling);
+      }
       if (message.type == SignalingMessageType.control) {
         final action = message.payload['action'];
-        if (mounted) {
+        if (action == SignalingControlAction.cameraReady) {
+          _sendMonitorReady(signaling);
+        }
+        if (mounted &&
+            (action == SignalingControlAction.start ||
+                action == SignalingControlAction.stop)) {
           setState(() => _status = _controlStatusLabel(action?.toString()));
         }
       }
@@ -94,6 +107,7 @@ class _MonitorScreenState extends State<MonitorScreen> {
     };
 
     signaling.onDisconnected = () {
+      _stopMonitorPresence();
       if (mounted) {
         setState(() => _status = 'Session closed');
       }
@@ -101,6 +115,13 @@ class _MonitorScreenState extends State<MonitorScreen> {
 
     rtc.onSignal = signaling.send;
     rtc.onConnectionState = (state) {
+      if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+        _stopMonitorPresence();
+      } else if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
+          state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected ||
+          state == RTCPeerConnectionState.RTCPeerConnectionStateClosed) {
+        _startMonitorPresence(signaling);
+      }
       if (mounted) {
         setState(() => _status = _peerStateLabel(state));
         if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
@@ -129,6 +150,7 @@ class _MonitorScreenState extends State<MonitorScreen> {
   }
 
   Future<void> _disconnect() async {
+    _stopMonitorPresence();
     await _signaling?.disconnect();
     await _rtc?.dispose();
 
@@ -219,6 +241,31 @@ class _MonitorScreenState extends State<MonitorScreen> {
     }
   }
 
+  void _startMonitorPresence(SignalingClient signaling) {
+    _stopMonitorPresence();
+    _sendMonitorReady(signaling);
+    _monitorPresenceTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _sendMonitorReady(signaling),
+    );
+  }
+
+  void _stopMonitorPresence() {
+    _monitorPresenceTimer?.cancel();
+    _monitorPresenceTimer = null;
+  }
+
+  void _sendMonitorReady(SignalingClient signaling) {
+    if (!signaling.isConnected) return;
+
+    signaling.send(
+      const SignalingMessage(
+        type: SignalingMessageType.control,
+        payload: {'action': SignalingControlAction.monitorReady},
+      ),
+    );
+  }
+
   void _maybeOpenFullscreenAfterConnect() {
     if (!mounted ||
         _didAutoOpenFullscreen ||
@@ -253,9 +300,9 @@ class _MonitorScreenState extends State<MonitorScreen> {
 
   String _controlStatusLabel(String? action) {
     switch (action) {
-      case 'start':
+      case SignalingControlAction.start:
         return 'Camera went live';
-      case 'stop':
+      case SignalingControlAction.stop:
         return 'Camera stopped streaming';
       default:
         return 'Control update received';
@@ -286,6 +333,7 @@ class _MonitorScreenState extends State<MonitorScreen> {
 
   @override
   void dispose() {
+    _stopMonitorPresence();
     _roomController.dispose();
     _signaling?.disconnect();
     _rtc?.dispose();

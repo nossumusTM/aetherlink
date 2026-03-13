@@ -32,8 +32,10 @@ class RtcManager {
   MediaRecorder? _mediaRecorder;
   Timer? _turnFallbackTimer;
   Timer? _activityPollTimer;
+  final List<RTCIceCandidate> _pendingRemoteCandidates = [];
   bool _isTurnFallbackActive = false;
   bool _isIceRestartInFlight = false;
+  bool _hasRemoteDescription = false;
   bool _seenRelayCandidate = false;
   bool _seenSrflxCandidate = false;
   bool _seenHostCandidate = false;
@@ -269,6 +271,8 @@ class RtcManager {
             message.payload['type'] as String,
           ),
         );
+        _hasRemoteDescription = true;
+        await _flushPendingRemoteCandidates();
         final answer = await createAnswer();
         onSignal?.call(answer);
         break;
@@ -279,19 +283,24 @@ class RtcManager {
             message.payload['type'] as String,
           ),
         );
+        _hasRemoteDescription = true;
+        await _flushPendingRemoteCandidates();
         if (message.payload['turnFallback'] == true) {
           await _activateTurnFallback(
               reason: 'relay-answer', renegotiate: false);
         }
         break;
       case SignalingMessageType.iceCandidate:
-        await _peerConnection!.addCandidate(
-          RTCIceCandidate(
-            message.payload['candidate'] as String?,
-            message.payload['sdpMid'] as String?,
-            message.payload['sdpMLineIndex'] as int?,
-          ),
+        final candidate = RTCIceCandidate(
+          message.payload['candidate'] as String?,
+          message.payload['sdpMid'] as String?,
+          message.payload['sdpMLineIndex'] as int?,
         );
+        if (!_hasRemoteDescription) {
+          _pendingRemoteCandidates.add(candidate);
+          return;
+        }
+        await _peerConnection!.addCandidate(candidate);
         break;
       case SignalingMessageType.control:
       case SignalingMessageType.join:
@@ -301,9 +310,24 @@ class RtcManager {
     }
   }
 
+  Future<void> _flushPendingRemoteCandidates() async {
+    if (!_hasRemoteDescription || _pendingRemoteCandidates.isEmpty) {
+      return;
+    }
+
+    final candidates = List<RTCIceCandidate>.from(_pendingRemoteCandidates);
+    _pendingRemoteCandidates.clear();
+
+    for (final candidate in candidates) {
+      await _peerConnection!.addCandidate(candidate);
+    }
+  }
+
   Future<void> dispose() async {
     _turnFallbackTimer?.cancel();
     _activityPollTimer?.cancel();
+    _pendingRemoteCandidates.clear();
+    _hasRemoteDescription = false;
     await stopRecording();
     await _releaseLocalStream();
     await _peerConnection?.close();
