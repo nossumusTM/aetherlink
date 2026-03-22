@@ -1,35 +1,88 @@
 PODS:
-  - flutter_webrtc (0.9.36):
+  - ffmpeg_kit_flutter_new_min_gpl (7.1.1):
+    - ffmpeg_kit_flutter_new_min_gpl/min-gpl (= 7.1.1)
     - FlutterMacOS
-    - WebRTC-SDK (= 114.5735.10)
+  - ffmpeg_kit_flutter_new_min_gpl/min-gpl (7.1.1):
+    - FlutterMacOS
+  - file_picker (0.0.1):
+    - FlutterMacOS
+  - flutter_webrtc (1.2.0):
+    - FlutterMacOS
+    - WebRTC-SDK (= 137.7151.12)
   - FlutterMacOS (1.0.0)
+  - geolocator_apple (1.2.0):
+    - Flutter
+    - FlutterMacOS
+  - media_kit_video (0.0.1):
+    - FlutterMacOS
+  - mobile_scanner (5.2.3):
+    - FlutterMacOS
+  - package_info_plus (0.0.1):
+    - FlutterMacOS
+  - shared_preferences_foundation (0.0.1):
+    - Flutter
+    - FlutterMacOS
   - video_player_avfoundation (0.0.1):
     - Flutter
     - FlutterMacOS
-  - WebRTC-SDK (114.5735.10)
+  - wakelock_plus (0.0.1):
+    - FlutterMacOS
+  - WebRTC-SDK (137.7151.12)
 
 DEPENDENCIES:
+  - ffmpeg_kit_flutter_new_min_gpl (from `Flutter/ephemeral/.symlinks/plugins/ffmpeg_kit_flutter_new_min_gpl/macos`)
+  - file_picker (from `Flutter/ephemeral/.symlinks/plugins/file_picker/macos`)
   - flutter_webrtc (from `Flutter/ephemeral/.symlinks/plugins/flutter_webrtc/macos`)
   - FlutterMacOS (from `Flutter/ephemeral`)
+  - geolocator_apple (from `Flutter/ephemeral/.symlinks/plugins/geolocator_apple/darwin`)
+  - media_kit_video (from `Flutter/ephemeral/.symlinks/plugins/media_kit_video/macos`)
+  - mobile_scanner (from `Flutter/ephemeral/.symlinks/plugins/mobile_scanner/macos`)
+  - package_info_plus (from `Flutter/ephemeral/.symlinks/plugins/package_info_plus/macos`)
+  - shared_preferences_foundation (from `Flutter/ephemeral/.symlinks/plugins/shared_preferences_foundation/darwin`)
   - video_player_avfoundation (from `Flutter/ephemeral/.symlinks/plugins/video_player_avfoundation/darwin`)
+  - wakelock_plus (from `Flutter/ephemeral/.symlinks/plugins/wakelock_plus/macos`)
 
 SPEC REPOS:
   trunk:
     - WebRTC-SDK
 
 EXTERNAL SOURCES:
+  ffmpeg_kit_flutter_new_min_gpl:
+    :path: Flutter/ephemeral/.symlinks/plugins/ffmpeg_kit_flutter_new_min_gpl/macos
+  file_picker:
+    :path: Flutter/ephemeral/.symlinks/plugins/file_picker/macos
   flutter_webrtc:
     :path: Flutter/ephemeral/.symlinks/plugins/flutter_webrtc/macos
   FlutterMacOS:
     :path: Flutter/ephemeral
+  geolocator_apple:
+    :path: Flutter/ephemeral/.symlinks/plugins/geolocator_apple/darwin
+  media_kit_video:
+    :path: Flutter/ephemeral/.symlinks/plugins/media_kit_video/macos
+  mobile_scanner:
+    :path: Flutter/ephemeral/.symlinks/plugins/mobile_scanner/macos
+  package_info_plus:
+    :path: Flutter/ephemeral/.symlinks/plugins/package_info_plus/macos
+  shared_preferences_foundation:
+    :path: Flutter/ephemeral/.symlinks/plugins/shared_preferences_foundation/darwin
   video_player_avfoundation:
     :path: Flutter/ephemeral/.symlinks/plugins/video_player_avfoundation/darwin
+  wakelock_plus:
+    :path: Flutter/ephemeral/.symlinks/plugins/wakelock_plus/macos
 
 SPEC CHECKSUMS:
-  flutter_webrtc: 8d46529f47d8108a50eb044e5049985a398d296a
+  ffmpeg_kit_flutter_new_min_gpl: 3e280d8650c72a719311199086207c6b242a6869
+  file_picker: 7584aae6fa07a041af2b36a2655122d42f578c1a
+  flutter_webrtc: 7cda18a9cd917db2f8bfcde8011804f6018a12df
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
+  geolocator_apple: ab36aa0e8b7d7a2d7639b3b4e48308394e8cef5e
+  media_kit_video: 28d7d27611c7769a2464eb7621c37386a61dcc9a
+  mobile_scanner: bd1e7cd9b67b442f4d903747f4778e040513f860
+  package_info_plus: f0052d280d17aa382b932f399edf32507174e870
+  shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
   video_player_avfoundation: dd410b52df6d2466a42d28550e33e4146928280a
-  WebRTC-SDK: 8c0edd05b880a39648118192c252667ea06dea51
+  wakelock_plus: 917609be14d812ddd9e9528876538b2263aaa03b
+  WebRTC-SDK: 1762e2de812354d27a8407d1b2c532064ec39fce
 
 PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
 

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teleck/config/app_config.dart';
+import 'package:sputni/config/app_config.dart';
 
 void main() {
   group('AppConfig ICE server configuration', () {
@@ -33,7 +33,7 @@ void main() {
       );
     });
 
-    test('adds the Teleck TURN relay pool for fallback', () {
+    test('adds the Sputni TURN relay pool for fallback', () {
       const config = AppConfig(
         signalingUrl: 'wss://signal.teleck.live/ws',
         enableTurn: true,

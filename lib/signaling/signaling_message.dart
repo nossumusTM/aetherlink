@@ -1,11 +1,14 @@
 import 'dart:convert';
 
 enum SignalingMessageType {
+  error,
   join,
   offer,
   answer,
   iceCandidate,
   control,
+  data,
+  secureSignal,
 }
 
 /// Typed signaling message contract exchanged over WebSocket.
@@ -15,6 +18,8 @@ enum SignalingMessageType {
 /// - offer/answer: {"sdp": "...", "type": "offer|answer"}
 /// - ice-candidate: {"candidate": "...", "sdpMid": "...", "sdpMLineIndex": 0}
 /// - control: {"action": "start|stop|camera-ready|monitor-ready"}
+/// - data: {"channel": "...", ...}
+/// - secure-signal: {"nonce": "...", "ciphertext": "...", "mac": "..."}
 class SignalingMessage {
   const SignalingMessage({
     required this.type,
@@ -51,6 +56,8 @@ class SignalingMessage {
 
   static SignalingMessageType _parseType(String wireType) {
     switch (wireType) {
+      case 'error':
+        return SignalingMessageType.error;
       case 'join':
         return SignalingMessageType.join;
       case 'offer':
@@ -61,6 +68,10 @@ class SignalingMessage {
         return SignalingMessageType.iceCandidate;
       case 'control':
         return SignalingMessageType.control;
+      case 'data':
+        return SignalingMessageType.data;
+      case 'secure-signal':
+        return SignalingMessageType.secureSignal;
       default:
         throw FormatException('Unsupported signaling type: $wireType');
     }
@@ -68,6 +79,8 @@ class SignalingMessage {
 
   static String _typeToWire(SignalingMessageType type) {
     switch (type) {
+      case SignalingMessageType.error:
+        return 'error';
       case SignalingMessageType.join:
         return 'join';
       case SignalingMessageType.offer:
@@ -78,6 +91,10 @@ class SignalingMessage {
         return 'ice-candidate';
       case SignalingMessageType.control:
         return 'control';
+      case SignalingMessageType.data:
+        return 'data';
+      case SignalingMessageType.secureSignal:
+        return 'secure-signal';
     }
   }
 }

@@ -14,7 +14,7 @@ class MainFlutterWindow: NSWindow {
 
     let registrar = flutterViewController.registrar(forPlugin: "NativeMacosRecorder")
     let recorderChannel = FlutterMethodChannel(
-      name: "teleck/native_recording",
+      name: "sputni/native_recording",
       binaryMessenger: registrar.messenger
     )
     let recorder = NativeMacosRecorder()
@@ -22,7 +22,7 @@ class MainFlutterWindow: NSWindow {
     nativeMacosRecorder = recorder
 
     let permissionChannel = FlutterMethodChannel(
-      name: "teleck/permissions",
+      name: "sputni/permissions",
       binaryMessenger: registrar.messenger
     )
     let permissionBridge = NativePermissionBridge()
@@ -81,7 +81,7 @@ final class NativePermissionBridge: NSObject {
 }
 
 final class NativeMacosRecorder: NSObject, AVCaptureFileOutputRecordingDelegate {
-  private let sessionQueue = DispatchQueue(label: "com.teleck.native_macos_recorder")
+  private let sessionQueue = DispatchQueue(label: "com.sputni.native_macos_recorder")
   private var captureSession: AVCaptureSession?
   private var movieOutput: AVCaptureMovieFileOutput?
   private var pendingStopResult: FlutterResult?

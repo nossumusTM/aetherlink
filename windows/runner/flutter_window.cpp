@@ -33,7 +33,7 @@ bool FlutterWindow::OnCreate() {
   native_recording_channel_ =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           flutter_controller_->engine()->messenger(),
-          "teleck/native_recording",
+          "sputni/native_recording",
           &flutter::StandardMethodCodec::GetInstance());
   native_recording_channel_->SetMethodCallHandler(
       [this](const flutter::MethodCall<flutter::EncodableValue>& call,

@@ -1,4 +1,4 @@
-import 'package:teleck/signaling/signaling_message.dart';
+import 'package:sputni/signaling/signaling_message.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

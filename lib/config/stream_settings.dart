@@ -15,6 +15,8 @@ enum ExposureMode { high, balanced, low }
 
 enum CameraLightMode { day, night }
 
+enum CameraViewMode { standard, panorama }
+
 enum DeviceViewportClass { phone, tablet, desktop }
 
 enum RecordingDirectoryMode { documents, appSupport, temporary, custom }
@@ -81,6 +83,40 @@ class VideoProfile {
     previewAspectRatio: 9 / 16,
     label: 'Power save',
   );
+
+  Map<String, dynamic> toMap() => {
+        'width': width,
+        'height': height,
+        'frameRate': frameRate,
+        'previewAspectRatio': previewAspectRatio,
+        'label': label,
+      };
+
+  static VideoProfile? fromMap(Map<String, dynamic>? map) {
+    if (map == null) return null;
+
+    final width = map['width'];
+    final height = map['height'];
+    final frameRate = map['frameRate'];
+    final previewAspectRatio = map['previewAspectRatio'];
+    final label = map['label'];
+
+    if (width is! int ||
+        height is! int ||
+        frameRate is! int ||
+        previewAspectRatio is! num ||
+        label is! String) {
+      return null;
+    }
+
+    return VideoProfile(
+      width: width,
+      height: height,
+      frameRate: frameRate,
+      previewAspectRatio: previewAspectRatio.toDouble(),
+      label: label,
+    );
+  }
 
   static VideoProfile powerSaveFor(DeviceViewportClass deviceClass) {
     final isPhone = deviceClass == DeviceViewportClass.phone;
@@ -164,6 +200,34 @@ class VideoProfile {
       },
     );
   }
+
+  VideoProfile adjustedForCameraView({
+    required VideoDisplayMode displayMode,
+    required CameraViewMode cameraViewMode,
+  }) {
+    final targetAspectRatio = _cameraPreviewAspectRatio(
+      displayMode: displayMode,
+      cameraViewMode: cameraViewMode,
+    );
+    final longEdge = math.max(width, height);
+
+    final adjustedWidth = displayMode == VideoDisplayMode.landscape
+        ? longEdge
+        : (longEdge * targetAspectRatio).round();
+    final adjustedHeight = displayMode == VideoDisplayMode.landscape
+        ? (longEdge / targetAspectRatio).round()
+        : longEdge;
+
+    final modeSuffix =
+        cameraViewMode == CameraViewMode.panorama ? ' panorama' : '';
+
+    return copyWith(
+      width: adjustedWidth,
+      height: adjustedHeight,
+      previewAspectRatio: targetAspectRatio,
+      label: '${adjustedWidth}x$adjustedHeight$modeSuffix',
+    );
+  }
 }
 
 class StreamSettings {
@@ -175,20 +239,22 @@ class StreamSettings {
     this.useMultipleStunServers = true,
     this.powerSaveMode = false,
     this.automaticPowerSavingMode = false,
-    this.enableMicrophone = false,
-    this.maxVideoBitrateKbps = 1200,
+    this.enableMicrophone = true,
+    this.maxVideoBitrateKbps = 2800,
     this.lowLightBoost = true,
     this.showConnectionReport = true,
     this.exposureMode = ExposureMode.balanced,
     this.cameraLightMode = CameraLightMode.day,
+    this.cameraViewMode = CameraViewMode.standard,
     this.activityDetectionEnabled = false,
     this.enableMonitorAudio = true,
     this.autoFullscreenOnConnect = false,
-    this.viewerPriority = ViewerPriorityMode.balanced,
+    this.viewerPriority = ViewerPriorityMode.clarity,
     this.videoDisplayMode,
-    this.videoQualityPreset = VideoQualityPreset.auto,
-    this.recordingDirectoryMode = RecordingDirectoryMode.documents,
+    this.videoQualityPreset = VideoQualityPreset.high,
+    this.recordingDirectoryMode = RecordingDirectoryMode.appSupport,
     this.customRecordingDirectoryPath,
+    this.customRecordingDirectoryUri,
     this.videoProfile = const VideoProfile(
       width: 960,
       height: 540,
@@ -209,6 +275,7 @@ class StreamSettings {
   final bool showConnectionReport;
   final ExposureMode exposureMode;
   final CameraLightMode cameraLightMode;
+  final CameraViewMode cameraViewMode;
   final bool activityDetectionEnabled;
   final bool enableMonitorAudio;
   final bool autoFullscreenOnConnect;
@@ -217,6 +284,7 @@ class StreamSettings {
   final VideoQualityPreset videoQualityPreset;
   final RecordingDirectoryMode recordingDirectoryMode;
   final String? customRecordingDirectoryPath;
+  final String? customRecordingDirectoryUri;
   final VideoProfile videoProfile;
 
   static const cameraDefaults = StreamSettings();
@@ -243,6 +311,7 @@ class StreamSettings {
     bool? showConnectionReport,
     ExposureMode? exposureMode,
     CameraLightMode? cameraLightMode,
+    CameraViewMode? cameraViewMode,
     bool? activityDetectionEnabled,
     bool? enableMonitorAudio,
     bool? autoFullscreenOnConnect,
@@ -251,6 +320,7 @@ class StreamSettings {
     VideoQualityPreset? videoQualityPreset,
     RecordingDirectoryMode? recordingDirectoryMode,
     Object? customRecordingDirectoryPath = _recordingDirectorySentinel,
+    Object? customRecordingDirectoryUri = _recordingDirectorySentinel,
     VideoProfile? videoProfile,
   }) {
     return StreamSettings(
@@ -267,6 +337,7 @@ class StreamSettings {
       showConnectionReport: showConnectionReport ?? this.showConnectionReport,
       exposureMode: exposureMode ?? this.exposureMode,
       cameraLightMode: cameraLightMode ?? this.cameraLightMode,
+      cameraViewMode: cameraViewMode ?? this.cameraViewMode,
       activityDetectionEnabled:
           activityDetectionEnabled ?? this.activityDetectionEnabled,
       enableMonitorAudio: enableMonitorAudio ?? this.enableMonitorAudio,
@@ -283,6 +354,12 @@ class StreamSettings {
       )
           ? this.customRecordingDirectoryPath
           : customRecordingDirectoryPath as String?,
+      customRecordingDirectoryUri: identical(
+        customRecordingDirectoryUri,
+        _recordingDirectorySentinel,
+      )
+          ? this.customRecordingDirectoryUri
+          : customRecordingDirectoryUri as String?,
       videoProfile: videoProfile ?? this.videoProfile,
     );
   }
@@ -299,20 +376,34 @@ class StreamSettings {
       screenWidth: screenWidth,
       screenHeight: screenHeight,
     );
-    final resolvedDisplayMode = videoDisplayMode ??
-        (deviceClass == DeviceViewportClass.phone
+    final resolvedDisplayMode = role == StreamViewportRole.camera
+        ? (deviceClass == DeviceViewportClass.phone
             ? VideoDisplayMode.portrait
-            : VideoDisplayMode.landscape);
-    final resolvedAspectRatio =
-        resolvedDisplayMode == VideoDisplayMode.landscape ? 16 / 9 : 9 / 16;
+            : VideoDisplayMode.landscape)
+        : (videoDisplayMode ??
+            (deviceClass == DeviceViewportClass.phone
+                ? VideoDisplayMode.portrait
+                : VideoDisplayMode.landscape));
+    final resolvedAspectRatio = _cameraPreviewAspectRatio(
+      displayMode: resolvedDisplayMode,
+      cameraViewMode: cameraViewMode,
+    );
 
-    final resolvedProfile = role == StreamViewportRole.camera && powerSaveMode
+    final baseProfile = role == StreamViewportRole.camera && powerSaveMode
         ? VideoProfile.powerSaveFor(deviceClass)
         : VideoProfile.adaptive(
             screenWidth: screenWidth,
             screenHeight: screenHeight,
             role: role,
             preset: videoQualityPreset,
+          );
+    final resolvedProfile = role == StreamViewportRole.camera
+        ? baseProfile.adjustedForCameraView(
+            displayMode: resolvedDisplayMode,
+            cameraViewMode: cameraViewMode,
+          )
+        : baseProfile.copyWith(
+            previewAspectRatio: resolvedAspectRatio,
           );
 
     return copyWith(
@@ -328,13 +419,12 @@ class StreamSettings {
       viewerPriority: role == StreamViewportRole.camera && powerSaveMode
           ? ViewerPriorityMode.balanced
           : viewerPriority,
+      cameraViewMode: cameraViewMode,
       videoDisplayMode: resolvedDisplayMode,
       videoQualityPreset: role == StreamViewportRole.camera && powerSaveMode
           ? VideoQualityPreset.dataSaver
           : videoQualityPreset,
-      videoProfile: resolvedProfile.copyWith(
-        previewAspectRatio: resolvedAspectRatio,
-      ),
+      videoProfile: resolvedProfile,
     );
   }
 
@@ -350,6 +440,18 @@ class StreamSettings {
         return 'Device default';
     }
   }
+
+  String get cameraViewLabel {
+    switch (cameraViewMode) {
+      case CameraViewMode.standard:
+        return 'Standard';
+      case CameraViewMode.panorama:
+        return 'Panorama';
+    }
+  }
+
+  double get cameraViewScale =>
+      cameraViewMode == CameraViewMode.panorama ? 1.08 : 1.0;
 
   String get qualityPresetLabel {
     switch (videoQualityPreset) {
@@ -370,7 +472,7 @@ class StreamSettings {
   String get recordingLocationLabel {
     switch (recordingDirectoryMode) {
       case RecordingDirectoryMode.documents:
-        return 'Documents';
+        return 'App storage';
       case RecordingDirectoryMode.appSupport:
         return 'App storage';
       case RecordingDirectoryMode.temporary:
@@ -383,7 +485,7 @@ class StreamSettings {
   String get recordingLocationDescription {
     switch (recordingDirectoryMode) {
       case RecordingDirectoryMode.documents:
-        return 'Store recordings in the device documents area.';
+        return 'Keep recordings inside the app support folder.';
       case RecordingDirectoryMode.appSupport:
         return 'Keep recordings inside the app support folder.';
       case RecordingDirectoryMode.temporary:
@@ -393,5 +495,144 @@ class StreamSettings {
             ? customRecordingDirectoryPath!
             : 'Choose a folder on this device.';
     }
+  }
+
+  Map<String, dynamic> toPersistenceMap({bool includeVideoProfile = false}) {
+    return {
+      'preferDirectP2P': preferDirectP2P,
+      'enableTurnFallback': enableTurnFallback,
+      'useMultipleStunServers': useMultipleStunServers,
+      'powerSaveMode': powerSaveMode,
+      'automaticPowerSavingMode': automaticPowerSavingMode,
+      'enableMicrophone': enableMicrophone,
+      'maxVideoBitrateKbps': maxVideoBitrateKbps,
+      'lowLightBoost': lowLightBoost,
+      'showConnectionReport': showConnectionReport,
+      'exposureMode': exposureMode.name,
+      'cameraLightMode': cameraLightMode.name,
+      'cameraViewMode': cameraViewMode.name,
+      'activityDetectionEnabled': activityDetectionEnabled,
+      'enableMonitorAudio': enableMonitorAudio,
+      'autoFullscreenOnConnect': autoFullscreenOnConnect,
+      'viewerPriority': viewerPriority.name,
+      'videoDisplayMode': videoDisplayMode?.name,
+      'videoQualityPreset': videoQualityPreset.name,
+      'recordingDirectoryMode': recordingDirectoryMode.name,
+      'customRecordingDirectoryPath': customRecordingDirectoryPath,
+      'customRecordingDirectoryUri': customRecordingDirectoryUri,
+      if (includeVideoProfile) 'videoProfile': videoProfile.toMap(),
+    };
+  }
+
+  Map<String, dynamic> toRemoteSyncMap() => toPersistenceMap(
+        includeVideoProfile: true,
+      )
+        ..remove('customRecordingDirectoryPath')
+        ..remove('customRecordingDirectoryUri')
+        ..remove('recordingDirectoryMode');
+
+  static StreamSettings fromPersistenceMap(
+    Map<String, dynamic> map, {
+    required StreamSettings fallback,
+  }) {
+    return fallback.copyWith(
+      preferDirectP2P:
+          map['preferDirectP2P'] as bool? ?? fallback.preferDirectP2P,
+      enableTurnFallback:
+          map['enableTurnFallback'] as bool? ?? fallback.enableTurnFallback,
+      useMultipleStunServers: map['useMultipleStunServers'] as bool? ??
+          fallback.useMultipleStunServers,
+      powerSaveMode: map['powerSaveMode'] as bool? ?? fallback.powerSaveMode,
+      automaticPowerSavingMode: map['automaticPowerSavingMode'] as bool? ??
+          fallback.automaticPowerSavingMode,
+      enableMicrophone:
+          map['enableMicrophone'] as bool? ?? fallback.enableMicrophone,
+      maxVideoBitrateKbps:
+          map['maxVideoBitrateKbps'] as int? ?? fallback.maxVideoBitrateKbps,
+      lowLightBoost: map['lowLightBoost'] as bool? ?? fallback.lowLightBoost,
+      showConnectionReport:
+          map['showConnectionReport'] as bool? ?? fallback.showConnectionReport,
+      exposureMode: _parseEnum(
+            ExposureMode.values,
+            map['exposureMode'] as String?,
+          ) ??
+          fallback.exposureMode,
+      cameraLightMode: _parseEnum(
+            CameraLightMode.values,
+            map['cameraLightMode'] as String?,
+          ) ??
+          fallback.cameraLightMode,
+      cameraViewMode: _parseEnum(
+            CameraViewMode.values,
+            map['cameraViewMode'] as String?,
+          ) ??
+          fallback.cameraViewMode,
+      activityDetectionEnabled: map['activityDetectionEnabled'] as bool? ??
+          fallback.activityDetectionEnabled,
+      enableMonitorAudio:
+          map['enableMonitorAudio'] as bool? ?? fallback.enableMonitorAudio,
+      autoFullscreenOnConnect: map['autoFullscreenOnConnect'] as bool? ??
+          fallback.autoFullscreenOnConnect,
+      viewerPriority: _parseEnum(
+            ViewerPriorityMode.values,
+            map['viewerPriority'] as String?,
+          ) ??
+          fallback.viewerPriority,
+      videoDisplayMode: _parseEnum(
+        VideoDisplayMode.values,
+        map['videoDisplayMode'] as String?,
+      ),
+      videoQualityPreset: _parseEnum(
+            VideoQualityPreset.values,
+            map['videoQualityPreset'] as String?,
+          ) ??
+          fallback.videoQualityPreset,
+      recordingDirectoryMode: () {
+        final parsedMode = _parseEnum(
+          RecordingDirectoryMode.values,
+          map['recordingDirectoryMode'] as String?,
+        );
+        if (parsedMode == RecordingDirectoryMode.documents) {
+          return RecordingDirectoryMode.appSupport;
+        }
+        return parsedMode ?? fallback.recordingDirectoryMode;
+      }(),
+      customRecordingDirectoryPath:
+          map['customRecordingDirectoryPath'] as String?,
+      customRecordingDirectoryUri:
+          map['customRecordingDirectoryUri'] as String?,
+      videoProfile: VideoProfile.fromMap(
+              (map['videoProfile'] as Map?)?.cast<String, dynamic>()) ??
+          fallback.videoProfile,
+    );
+  }
+
+  static T? _parseEnum<T extends Enum>(List<T> values, String? name) {
+    if (name == null || name.isEmpty) {
+      return null;
+    }
+
+    for (final value in values) {
+      if (value.name == name) {
+        return value;
+      }
+    }
+    return null;
+  }
+}
+
+double _cameraPreviewAspectRatio({
+  required VideoDisplayMode displayMode,
+  required CameraViewMode cameraViewMode,
+}) {
+  switch ((displayMode, cameraViewMode)) {
+    case (VideoDisplayMode.landscape, CameraViewMode.standard):
+      return 16 / 9;
+    case (VideoDisplayMode.portrait, CameraViewMode.standard):
+      return 9 / 16;
+    case (VideoDisplayMode.landscape, CameraViewMode.panorama):
+      return 21 / 9;
+    case (VideoDisplayMode.portrait, CameraViewMode.panorama):
+      return 9 / 21;
   }
 }
