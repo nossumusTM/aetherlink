@@ -28,12 +28,12 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera access is required to scan pairing QR codes.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Location access is required to share your position with paired devices.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Background location access keeps Sputni Geo tracking active while the app is in the background.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Background location access keeps Sputni Geo tracking active while the app is in the background.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Location access is required to share your position with paired devices.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

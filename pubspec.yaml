@@ -34,9 +34,16 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.14.3
 
 flutter:
   uses-material-design: true
   assets:
     - assets/branding/
     - assets/media/
+
+flutter_launcher_icons:
+  ios: true
+  android: false
+  image_path: assets/branding/sputni_icon_square.png
+  remove_alpha_ios: true
